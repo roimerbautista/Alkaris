@@ -19,3 +19,9 @@ python-vlc
 Levenshtein
 psutil
 google-generativeai
+# Dependencias para Avatar 3D
+moderngl
+PyOpenGL
+PyOpenGL_accelerate
+glfw
+Pillow

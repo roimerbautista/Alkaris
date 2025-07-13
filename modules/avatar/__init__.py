@@ -1,0 +1,1 @@
+# Avatar module for 3D assistant representation

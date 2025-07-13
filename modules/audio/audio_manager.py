@@ -24,6 +24,11 @@ class AudioManager:
 
         with self.audio_lock:
             try:
+                # Verificar si el mixer está inicializado
+                if not pygame.mixer.get_init():
+                    print("Reinicializando pygame mixer...")
+                    pygame.mixer.init()
+                
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmpfile:
                     archivo_audio = tmpfile.name
                 

@@ -40,6 +40,7 @@ from modules.media_players.mpv_player import MPVPlayer
 from modules.media_players.vlc_player import VLCPlayer
 from utils.audio_utils import normalizar_audio
 from gui.main_gui import MainGUI  # Importamos MainGUI aquí
+from modules.avatar.avatar_integration import avatar_manager, start_3d_avatar, stop_3d_avatar, on_assistant_speaking, on_assistant_silent, on_assistant_listening, on_assistant_not_listening, update_speech_level, set_avatar_emotion, make_avatar_blink
 
 from google import genai
 from google.genai import types # Import types for Gemini API configuration
@@ -93,48 +94,108 @@ class SpotifyVoiceControl:
         self.error_log_file = "error_log.txt"
         self.is_internet_available = True
         self.energy_threshold = 5000
-        self.energy_threshold_slider = None # Inicializado en init_gui
-        self.label_nombre_asistente = None # Inicializado en init_gui
-        self.entry_cancion = None # Inicializado en init_gui
-        self.canvas = None # Inicializado en init_gui
-        self.estado_circulo = None # Inicializado en init_gui
+        # Referencias a GUI tkinter eliminadas - ahora integradas en el avatar
 
 
-        self.main_gui = MainGUI(self) # Inicializamos la GUI aquí, pasando la instancia de SpotifyVoiceControl
-        self.root = self.main_gui.root # Obtenemos la referencia al root de Tkinter
-
-        self.main_gui.init_ui() # Inicializar los elementos de la GUI usando el método en MainGUI
-        self.load_config_to_gui() # Cargar la configuración a los elementos de la GUI
-
-
-    def load_config_to_gui(self):
-        """Carga la configuración a los elementos de la GUI."""
-        if self.energy_threshold_slider:
-            self.energy_threshold_slider.set(self.energy_threshold)
-        if self.label_nombre_asistente:
-            self.label_nombre_asistente.config(text=f"Asistente: {self.asistente_nombre}")
+        # Eliminar GUI tkinter - ahora todo está integrado en el avatar
+        # self.main_gui = MainGUI(self) # ELIMINADO
+        # self.root = self.main_gui.root # ELIMINADO
+        
+        # Inicializar avatar 3D con interfaz integrada
+        self.avatar_enabled = config.get("avatar_3d_enabled", True)
+        if self.avatar_enabled:
+            try:
+                print("Iniciando avatar 3D con interfaz integrada...")
+                start_3d_avatar(self)  # Pasar referencia de la aplicación
+                print("Avatar 3D iniciado correctamente")
+            except Exception as e:
+                print(f"Error al iniciar avatar 3D: {e}")
+                self.avatar_enabled = False
+        else:
+            print("Avatar 3D deshabilitado en configuración")
 
 
     def iniciar_en_hilo(self):
         """
-        Inicia la lógica principal en un hilo separado para no bloquear la GUI.
+        Inicia la lógica principal en un hilo separado.
         """
         Thread(target=self.ejecutar, daemon=True).start()
 
     def actualizar_estado_escucha(self, escuchando):
         """
-        Actualiza el color del indicador en la GUI para mostrar si está escuchando.
+        Actualiza el estado de escucha en el avatar.
         """
-        color = "green" if escuchando else "red"
-        if self.canvas and self.estado_circulo:
-            self.canvas.itemconfig(self.estado_circulo, fill=color)
+        if self.avatar_enabled:
+            if escuchando:
+                on_assistant_listening()
+            else:
+                on_assistant_not_listening()
 
     def on_closing(self):
         """
-        Acciones a realizar al cerrar la ventana.
+        Acciones a realizar al cerrar la aplicación.
         """
         print("Cerrando aplicación...")
-        self.root.destroy()
+        
+        # Detener avatar 3D si está habilitado
+        if hasattr(self, 'avatar_enabled') and self.avatar_enabled:
+            try:
+                print("Deteniendo avatar 3D...")
+                stop_3d_avatar()
+                print("Avatar 3D detenido")
+            except Exception as e:
+                print(f"Error al detener avatar 3D: {e}")
+    
+    def buscar_youtube(self, query):
+        """
+        Buscar y reproducir video de YouTube.
+        """
+        try:
+            self.youtube_controller.buscar_y_reproducir(query)
+            self.responder_con_audio(f"Buscando {query} en YouTube")
+        except Exception as e:
+            print(f"Error al buscar en YouTube: {e}")
+            self.responder_con_audio("Error al buscar en YouTube")
+    
+    def iniciar_escucha_continua(self):
+        """
+        Iniciar escucha continua del asistente.
+        """
+        if not hasattr(self, 'escuchando') or not self.escuchando:
+            self.escuchando = True
+            self.actualizar_estado_escucha(True)
+            Thread(target=self.ejecutar, daemon=True).start()
+    
+    def detener_escucha(self):
+        """
+        Detener escucha del asistente.
+        """
+        self.escuchando = False
+        self.actualizar_estado_escucha(False)
+    
+    def buscar_youtube_y_reproducir_desde_ui(self):
+        """
+        Método para compatibilidad con la interfaz integrada.
+        """
+        # Este método se mantiene para compatibilidad pero ahora se maneja desde el avatar
+        pass
+    
+    def on_threshold_change(self, event=None):
+        """
+        Manejar cambio en el umbral de energía.
+        """
+        # El umbral ahora se actualiza directamente desde el avatar
+        pass
+    
+    def reiniciar_configuracion(self):
+        """
+        Restablece la configuración del asistente a los valores predeterminados.
+        """
+        self.asistente_nombre = "Alkaris"
+        self.acento_asistente = 'es'
+        self.energy_threshold = 5000
+        self.save_config()
+        self.responder_con_audio("Configuración restablecida a valores predeterminados.")
 
 
     def autenticar_spotify(self):
@@ -278,13 +339,28 @@ class SpotifyVoiceControl:
         recognizer = sr.Recognizer()
         try:
             with sr.Microphone(device_index=0) as source:
-                current_threshold = self.energy_threshold_slider.get()
+                current_threshold = self.energy_threshold
                 recognizer.energy_threshold = current_threshold
                 recognizer.adjust_for_ambient_noise(source, duration=0.8)
                 self.actualizar_estado_escucha(True)
+                
+                # Notificar al avatar que el asistente está escuchando
+                if hasattr(self, 'avatar_enabled') and self.avatar_enabled:
+                    try:
+                        on_assistant_listening()
+                    except Exception as e:
+                        print(f"Error al notificar avatar (escuchando): {e}")
+                
                 print("Escuchando...")
                 audio = recognizer.listen(source, timeout=timeout, phrase_time_limit=5)
                 self.actualizar_estado_escucha(False)
+                
+                # Notificar al avatar que el asistente terminó de escuchar
+                if hasattr(self, 'avatar_enabled') and self.avatar_enabled:
+                    try:
+                        on_assistant_not_listening()
+                    except Exception as e:
+                        print(f"Error al notificar avatar (no escuchando): {e}")
 
             processed_audio_data, processed_sample_rate = self.reducir_ruido(audio)
             if processed_audio_data is None:
@@ -345,10 +421,10 @@ class SpotifyVoiceControl:
     def first_time_setup(self):
         """
         Configuración inicial en la primera ejecución.
-        Se programa para ejecutarse después de que la interfaz gráfica esté completamente cargada.
         """
-        self.root.after(100, self.presentar_aplicacion)
-        self.root.after(100, self.save_config)
+        # Ejecutar presentación y guardado de configuración directamente
+        self.presentar_aplicacion()
+        self.save_config()
 
     def presentar_aplicacion(self):
         """
@@ -371,7 +447,7 @@ class SpotifyVoiceControl:
             "selected_voice_index": self.engine.getProperty('voice'),
             "asistente_nombre": self.asistente_nombre,
             "acento_asistente": self.acento_asistente,
-            "energy_threshold": self.energy_threshold_slider.get()
+            "energy_threshold": self.energy_threshold
         }
         self.config_manager.save_config(config_data)
 
@@ -382,12 +458,10 @@ class SpotifyVoiceControl:
             self.asistente_nombre = config_data.get("asistente_nombre", self.asistente_nombre)
             self.acento_asistente = config_data.get("acento_asistente", self.acento_asistente)
             selected_voice_id = config_data.get("selected_voice_index", None)
-            energy_threshold = config_data.get("energy_threshold", 5000)
+            self.energy_threshold = config_data.get("energy_threshold", 5000)
 
             if selected_voice_id:
                 self.engine.setProperty('voice', selected_voice_id)
-            if self.energy_threshold_slider:
-                self.energy_threshold_slider.set(energy_threshold)
 
 
     def set_voice(self, voice_index):
@@ -451,10 +525,6 @@ class SpotifyVoiceControl:
         self.acento_asistente = 'es'
         self.energy_threshold = 5000
         self.save_config()
-
-        if self.label_nombre_asistente:
-            self.label_nombre_asistente.config(text=f"Asistente: {self.asistente_nombre}")
-
         self.responder_con_audio("La configuración del asistente ha sido reiniciada a los valores predeterminados.")
 
     def verificar_conexion_internet(self):
@@ -531,8 +601,23 @@ class SpotifyVoiceControl:
     def responder_con_audio(self, respuesta, idioma=None):
        # """Responde con audio utilizando la voz de Gemini Live API."""
        ## asyncio.run(self._responder_con_audio_gemini_async(respuesta, idioma))
+        
+        # Notificar al avatar que el asistente va a hablar
+        if hasattr(self, 'avatar_enabled') and self.avatar_enabled:
+            try:
+                on_assistant_speaking()
+            except Exception as e:
+                print(f"Error al notificar avatar (inicio): {e}")
+        
         print("Falling back to pyttsx3 text-to-speech...")
-        self.audio_manager.responder_con_audio(respuesta, idioma) 
+        self.audio_manager.responder_con_audio(respuesta, idioma)
+        
+        # Notificar al avatar que el asistente terminó de hablar
+        if hasattr(self, 'avatar_enabled') and self.avatar_enabled:
+            try:
+                on_assistant_silent()
+            except Exception as e:
+                print(f"Error al notificar avatar (fin): {e}") 
 
     async def _responder_con_audio_gemini_async(self, respuesta, idioma=None):
         """Asynchronous function to respond with audio using Gemini Live API."""
@@ -740,13 +825,8 @@ class SpotifyVoiceControl:
 
     def buscar_youtube_y_reproducir_desde_ui(self):
         """Función para buscar y reproducir una canción en YouTube usando VLC basada en la entrada del usuario."""
-        cancion = self.entry_cancion.get()
-        if cancion.strip():
-            self.buscar_youtube_y_reproducir_con_vlc(cancion)
-            self.entry_cancion.delete(0, tk.END)
-        else:
-            self.responder_con_audio("Por favor, introduce el nombre de una canción para buscar.")
-            self.entry_cancion.delete(0, tk.END)
+        # Este método se mantiene para compatibilidad pero ahora se maneja desde el avatar
+        pass
 
     def vlc_play_pause(self):
         self.youtube_controller.vlc_play_pause()
@@ -919,7 +999,7 @@ class SpotifyVoiceControl:
                             self.responder_con_audio("Por favor, indica un número después de 'volumen' para establecer el volumen.") # Now using Gemini voice
                     elif "salir" in comando:
                         self.responder_con_audio("Saliendo de la aplicación") # Now using Gemini voice
-                        self.root.destroy()
+                        # La aplicación se cierra desde el avatar principal
                         break
 
                     elif comando == "cambiar nombre del asistente":
