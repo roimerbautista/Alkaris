@@ -70,7 +70,7 @@ class SpotifyVoiceControl:
         self.config_manager = ConfigManager("spotify_voice_control_config.json")
         config = self.config_manager.load_config()
 
-        self.asistente_nombre = config.get("asistente_nombre", "alexa")
+        self.asistente_nombre = config.get("asistente_nombre", "Alkaris")
         self.acento_asistente = config.get("acento_asistente", 'es')
         self.energy_threshold = config.get("energy_threshold", 5000)
 
@@ -189,6 +189,90 @@ class SpotifyVoiceControl:
             print(f"Error capturing audio: {e}")
             return None
 
+    def generar_variaciones_nombre(self, nombre):
+        """
+        Genera automáticamente variaciones fonéticas y de pronunciación para cualquier nombre del asistente.
+        Esto permite un reconocimiento más flexible independientemente del nombre configurado.
+        """
+        nombre_lower = nombre.lower()
+        variaciones = [nombre_lower]
+        
+        # Remover acentos para variaciones
+        nombre_sin_acentos = unidecode.unidecode(nombre_lower)
+        if nombre_sin_acentos != nombre_lower:
+            variaciones.append(nombre_sin_acentos)
+        
+        # Variaciones específicas para nombres comunes
+        if nombre_lower == "alkaris":
+            variaciones.extend([
+                "al karis", "al caris", "alcaris", "al kari", "al cari",
+                "alkari", "al karis", "al karis", "al caris"
+            ])
+        
+        # Separaciones comunes con espacios
+        if len(nombre_lower) > 3:
+            # Separar después de 2 caracteres
+            if len(nombre_lower) > 2:
+                variaciones.append(f"{nombre_lower[:2]} {nombre_lower[2:]}")
+            # Separar después de 3 caracteres
+            if len(nombre_lower) > 3:
+                variaciones.append(f"{nombre_lower[:3]} {nombre_lower[3:]}")
+            # Separación por mitad
+            mitad = len(nombre_lower) // 2
+            variaciones.append(f"{nombre_lower[:mitad]} {nombre_lower[mitad:]}")
+        
+        # Variaciones fonéticas comunes
+        variaciones_foneticas = {
+            'k': ['c', 'qu'],
+            'c': ['k', 'qu'],
+            'qu': ['k', 'c'],
+            'z': ['s'],
+            's': ['z'],
+            'b': ['v'],
+            'v': ['b'],
+            'y': ['i', 'll'],
+            'll': ['y', 'i'],
+            'j': ['g'],
+            'g': ['j'],
+            'r': ['rr'],
+            'rr': ['r']
+        }
+        
+        # Aplicar variaciones fonéticas
+        variaciones_base = variaciones.copy()
+        for variacion_base in variaciones_base:
+            for original, reemplazos in variaciones_foneticas.items():
+                if original in variacion_base:
+                    for reemplazo in reemplazos:
+                        nueva_variacion = variacion_base.replace(original, reemplazo)
+                        variaciones.append(nueva_variacion)
+        
+        # Variaciones con errores comunes de reconocimiento
+        variaciones_base = variaciones.copy()
+        for variacion_base in variaciones_base:
+            # Agregar/quitar vocales al final
+            if variacion_base.endswith(('a', 'e', 'i', 'o', 'u')):
+                variaciones.append(variacion_base[:-1])  # Sin vocal final
+            else:
+                for vocal in ['a', 'e', 'i', 'o', 'u']:
+                    variaciones.append(variacion_base + vocal)  # Con vocal agregada
+        
+        # Variaciones con 'al' al inicio (muy común en reconocimiento de voz)
+        variaciones_base = variaciones.copy()
+        for variacion_base in variaciones_base:
+            if not variacion_base.startswith('al'):
+                variaciones.append(f"al {variacion_base}")
+                variaciones.append(f"al{variacion_base}")
+        
+        # Eliminar duplicados, espacios extra y retornar
+        variaciones_limpias = []
+        for var in variaciones:
+            var_limpia = ' '.join(var.split())  # Eliminar espacios extra
+            if var_limpia and var_limpia not in variaciones_limpias:
+                variaciones_limpias.append(var_limpia)
+        
+        return variaciones_limpias
+
 
     def reconocimiento_de_voz(self, timeout=50):
         recognizer = sr.Recognizer()
@@ -225,10 +309,22 @@ class SpotifyVoiceControl:
                     os.remove(temp_filename)
 
             comando_completo = comando_completo.replace("de tener", "detener")
-            if self.asistente_nombre.lower() in comando_completo:
-                comando = comando_completo.replace(self.asistente_nombre.lower(), "", 1).strip()
+            
+            # Generar variaciones automáticamente para el nombre actual
+            variaciones_nombre = self.generar_variaciones_nombre(self.asistente_nombre)
+            
+            print(f"Buscando variaciones de '{self.asistente_nombre}': {variaciones_nombre[:5]}...")  # Mostrar solo las primeras 5
+            
+            nombre_encontrado = None
+            for variacion in variaciones_nombre:
+                if variacion in comando_completo:
+                    nombre_encontrado = variacion
+                    print(f"Nombre encontrado: '{variacion}'")
+                    break
+            
+            if nombre_encontrado:
+                comando = comando_completo.replace(nombre_encontrado, "", 1).strip()
                 return True, comando
-
             else:
                 print(f"El nombre del asistente no fue mencionado: {comando_completo}")
                 return False, ""
@@ -351,7 +447,7 @@ class SpotifyVoiceControl:
         """
         Restablece la configuración del asistente a los valores predeterminados.
         """
-        self.asistente_nombre = "alexa"
+        self.asistente_nombre = "Alkaris"
         self.acento_asistente = 'es'
         self.energy_threshold = 5000
         self.save_config()
