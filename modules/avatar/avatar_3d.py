@@ -22,7 +22,7 @@ import json
 import os
 
 class Avatar3D:
-    def __init__(self, width=1200, height=800, app_instance=None):
+    def __init__(self, width=900, height=600, app_instance=None):
         """Inicializar el avatar 3D mejorado"""
         self.width = width
         self.height = height
@@ -53,10 +53,23 @@ class Avatar3D:
         self.slider_dragging = False
         self.slider_value = 5000
         
+        # Panel de logs desplegable
+        self.logs_panel_open = False
+        self.logs_panel_height = 200
+        self.logs_scroll_offset = 0
+        self.command_logs = []
+        self.max_logs = 50
+        
+        # Visualizador de música
+        self.music_bars = [0.0] * 20  # 20 barras para el visualizador
+        self.music_playing = False
+        self.music_volume = 0.0
+        
         # Posiciones de elementos GUI
         self.slider_rect = None
         self.input_rect = None
         self.button_rects = {}
+        self.logs_toggle_rect = None
         
         # Inicializar pygame
         self._init_pygame()
@@ -145,7 +158,7 @@ class Avatar3D:
     
     def _draw_info_panel(self):
         """Dibujar panel de información lateral con controles integrados"""
-        panel_width = 300
+        panel_width = 250  # Reducido para ventana más pequeña
         panel_height = self.height
         panel_x = self.width - panel_width
         panel_y = 0
@@ -237,6 +250,14 @@ class Avatar3D:
         time_text = info_font.render(f"Tiempo: {minutes:02d}:{seconds:02d}", True, (255, 255, 255))
         self.screen.blit(time_text, (panel_x + 10, panel_y + y_offset))
         y_offset += 40
+        
+        # Visualizador de música
+        self._draw_music_visualizer(panel_x, panel_y, y_offset)
+        y_offset += 80
+        
+        # Botón de logs
+        self._draw_logs_toggle_button(panel_x, panel_y, y_offset)
+        y_offset += 40
     
     def _draw_noise_slider(self, panel_x, panel_y, y_offset):
         """Dibujar slider de supresión de ruido"""
@@ -247,7 +268,7 @@ class Avatar3D:
         # Slider
         slider_x = panel_x + 20
         slider_y = panel_y + y_offset + 25
-        slider_width = 200
+        slider_width = 180  # Ajustado para panel más pequeño
         slider_height = 20
         
         self.slider_rect = pygame.Rect(slider_x, slider_y, slider_width, slider_height)
@@ -266,7 +287,7 @@ class Avatar3D:
         
         # Valor actual
         value_text = font.render(f"{int(self.slider_value)}", True, (255, 255, 255))
-        self.screen.blit(value_text, (panel_x + 240, panel_y + y_offset + 25))
+        self.screen.blit(value_text, (panel_x + 210, panel_y + y_offset + 25))
     
     def _draw_youtube_input(self, panel_x, panel_y, y_offset):
         """Dibujar campo de entrada para YouTube"""
@@ -277,7 +298,7 @@ class Avatar3D:
         # Campo de entrada
         input_x = panel_x + 20
         input_y = panel_y + y_offset + 25
-        input_width = 200
+        input_width = 180  # Ajustado para panel más pequeño
         input_height = 25
         
         self.input_rect = pygame.Rect(input_x, input_y, input_width, input_height)
@@ -354,6 +375,144 @@ class Avatar3D:
         text_x = center_x - text_surface.get_width() // 2
         text_y = center_y + radius + 10
         self.screen.blit(text_surface, (text_x, text_y))
+    
+    def _draw_music_visualizer(self, panel_x, panel_y, y_offset):
+        """Dibujar visualizador de música con barras"""
+        font = pygame.font.Font(None, 18)
+        label = font.render("Visualizador de Música:", True, (255, 255, 255))
+        self.screen.blit(label, (panel_x + 10, panel_y + y_offset))
+        
+        # Área del visualizador
+        viz_x = panel_x + 20
+        viz_y = panel_y + y_offset + 25
+        viz_width = 180
+        viz_height = 40
+        
+        # Fondo del visualizador
+        pygame.draw.rect(self.screen, (20, 20, 30), 
+                        (viz_x, viz_y, viz_width, viz_height))
+        pygame.draw.rect(self.screen, (100, 100, 120), 
+                        (viz_x, viz_y, viz_width, viz_height), 2)
+        
+        # Dibujar barras
+        bar_width = viz_width // len(self.music_bars)
+        for i, bar_height in enumerate(self.music_bars):
+            bar_x = viz_x + i * bar_width
+            bar_actual_height = int(bar_height * viz_height)
+            bar_y = viz_y + viz_height - bar_actual_height
+            
+            # Color de la barra según la altura
+            if bar_height > 0.7:
+                color = (255, 100, 100)  # Rojo para niveles altos
+            elif bar_height > 0.4:
+                color = (255, 255, 100)  # Amarillo para niveles medios
+            else:
+                color = (100, 255, 100)  # Verde para niveles bajos
+            
+            if bar_actual_height > 0:
+                pygame.draw.rect(self.screen, color, 
+                               (bar_x + 1, bar_y, bar_width - 2, bar_actual_height))
+        
+        # Indicador de estado de música
+        status_text = "♪ Reproduciendo" if self.music_playing else "♪ Silencio"
+        status_color = (100, 255, 100) if self.music_playing else (150, 150, 150)
+        status_surface = font.render(status_text, True, status_color)
+        self.screen.blit(status_surface, (panel_x + 10, panel_y + y_offset + 50))
+    
+    def _draw_logs_toggle_button(self, panel_x, panel_y, y_offset):
+        """Dibujar botón para mostrar/ocultar logs"""
+        button_width = 180
+        button_height = 25
+        button_x = panel_x + 20
+        button_y = panel_y + y_offset
+        
+        self.logs_toggle_rect = pygame.Rect(button_x, button_y, button_width, button_height)
+        
+        # Color del botón según el estado
+        color = (100, 150, 200) if self.logs_panel_open else (80, 80, 120)
+        pygame.draw.rect(self.screen, color, self.logs_toggle_rect)
+        pygame.draw.rect(self.screen, (200, 200, 255), self.logs_toggle_rect, 2)
+        
+        # Texto del botón
+        font = pygame.font.Font(None, 18)
+        text = "▼ Ocultar Logs" if self.logs_panel_open else "▶ Mostrar Logs"
+        text_surface = font.render(text, True, (255, 255, 255))
+        text_x = button_x + (button_width - text_surface.get_width()) // 2
+        text_y = button_y + (button_height - text_surface.get_height()) // 2
+        self.screen.blit(text_surface, (text_x, text_y))
+    
+    def _draw_logs_panel(self):
+        """Dibujar panel de logs desplegable"""
+        if not self.logs_panel_open:
+            return
+        
+        # Posición del panel de logs (parte inferior)
+        panel_x = 10
+        panel_y = self.height - self.logs_panel_height - 10
+        panel_width = self.width - 20
+        panel_height = self.logs_panel_height
+        
+        # Fondo del panel con transparencia
+        logs_surface = pygame.Surface((panel_width, panel_height))
+        logs_surface.set_alpha(220)
+        logs_surface.fill((15, 15, 25))
+        self.screen.blit(logs_surface, (panel_x, panel_y))
+        
+        # Borde del panel
+        pygame.draw.rect(self.screen, (100, 150, 200), 
+                        (panel_x, panel_y, panel_width, panel_height), 2)
+        
+        # Título del panel
+        title_font = pygame.font.Font(None, 20)
+        title_text = title_font.render("📋 Registro de Comandos y Respuestas", True, (255, 255, 255))
+        self.screen.blit(title_text, (panel_x + 10, panel_y + 5))
+        
+        # Área de logs
+        logs_area_y = panel_y + 30
+        logs_area_height = panel_height - 35
+        
+        # Dibujar logs
+        font = pygame.font.Font(None, 16)
+        line_height = 18
+        visible_lines = logs_area_height // line_height
+        
+        # Calcular qué logs mostrar
+        start_index = max(0, len(self.command_logs) - visible_lines - self.logs_scroll_offset)
+        end_index = min(len(self.command_logs), start_index + visible_lines)
+        
+        for i, log_entry in enumerate(self.command_logs[start_index:end_index]):
+            y_pos = logs_area_y + i * line_height
+            
+            # Color según el tipo de log
+            if log_entry['type'] == 'command':
+                color = (150, 255, 150)  # Verde para comandos
+                prefix = "🎤"
+            elif log_entry['type'] == 'response':
+                color = (150, 150, 255)  # Azul para respuestas
+                prefix = "🔊"
+            elif log_entry['type'] == 'error':
+                color = (255, 150, 150)  # Rojo para errores
+                prefix = "❌"
+            else:
+                color = (200, 200, 200)  # Gris para info
+                prefix = "ℹ️"
+            
+            # Formatear el texto del log
+            log_text = f"[{log_entry['timestamp']}] {prefix} {log_entry['message']}"
+            
+            # Truncar si es muy largo
+            max_chars = (panel_width - 20) // 8  # Aproximación de caracteres por línea
+            if len(log_text) > max_chars:
+                log_text = log_text[:max_chars-3] + "..."
+            
+            text_surface = font.render(log_text, True, color)
+            self.screen.blit(text_surface, (panel_x + 10, y_pos))
+        
+        # Indicador de scroll si hay más logs
+        if len(self.command_logs) > visible_lines:
+            scroll_indicator = f"({len(self.command_logs) - visible_lines - self.logs_scroll_offset}/{len(self.command_logs)})"
+            scroll_text = font.render(scroll_indicator, True, (150, 150, 150))
+            self.screen.blit(scroll_text, (panel_x + panel_width - 100, panel_y + 5))
     
     def _draw_status_indicators(self):
         """Dibujar indicadores de estado en la parte superior"""
@@ -795,6 +954,10 @@ class Avatar3D:
         # Panel de información lateral
         self._draw_info_panel()
         
+        # Panel de logs (si está abierto)
+        if self.logs_panel_open:
+            self._draw_logs_panel()
+        
         # Indicadores de estado
         self._draw_status_indicators()
         
@@ -879,6 +1042,9 @@ class Avatar3D:
             # Actualizar animaciones
             self.update_animation(dt)
             
+            # Actualizar visualizador de música
+            self.update_music_visualizer()
+            
             # Renderizar
             self.render()
             pygame.display.flip()
@@ -916,6 +1082,10 @@ class Avatar3D:
                 self.input_active = True
             else:
                 self.input_active = False
+            
+            # Verificar click en botón de logs
+            if self.logs_toggle_rect and self.logs_toggle_rect.collidepoint(event.pos):
+                self.logs_panel_open = not self.logs_panel_open
             
             # Verificar clicks en botones
             for button_key, button_rect in self.button_rects.items():
@@ -958,6 +1128,39 @@ class Avatar3D:
             # Buscar en YouTube con texto actual
             if self.youtube_search_text.strip():
                 self.app_instance.buscar_youtube(self.youtube_search_text)
+    
+    def add_log(self, log_type, message):
+        """Añadir un log al panel de logs"""
+        timestamp = time.strftime("%H:%M:%S")
+        log_entry = {
+            'timestamp': timestamp,
+            'type': log_type,  # 'command', 'response', 'error', 'info'
+            'message': message
+        }
+        self.command_logs.append(log_entry)
+        
+        # Mantener solo los últimos logs
+        if len(self.command_logs) > self.max_logs:
+            self.command_logs.pop(0)
+    
+    def update_music_visualizer(self, audio_data=None):
+        """Actualizar el visualizador de música"""
+        if audio_data is not None:
+            # Simular análisis de frecuencia
+            import random
+            for i in range(len(self.music_bars)):
+                # Simular diferentes frecuencias
+                target = random.random() * self.music_volume if self.music_playing else 0.0
+                self.music_bars[i] = self.music_bars[i] * 0.7 + target * 0.3
+        else:
+            # Decaimiento gradual cuando no hay audio
+            for i in range(len(self.music_bars)):
+                self.music_bars[i] *= 0.85
+    
+    def set_music_playing(self, playing, volume=0.5):
+        """Establecer el estado de reproducción de música"""
+        self.music_playing = playing
+        self.music_volume = volume if playing else 0.0
     
     def stop(self):
         """Detener el avatar"""

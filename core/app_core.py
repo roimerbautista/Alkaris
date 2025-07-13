@@ -153,6 +153,16 @@ class SpotifyVoiceControl:
         try:
             self.youtube_controller.buscar_y_reproducir(query)
             self.responder_con_audio(f"Buscando {query} en YouTube")
+            
+            # Activar visualizador de música para YouTube
+            if hasattr(self, 'avatar_enabled') and self.avatar_enabled:
+                try:
+                    from modules.avatar.avatar_integration import avatar_manager
+                    if avatar_manager and avatar_manager.avatar:
+                        avatar_manager.avatar.set_music_playing(True, 0.6)
+                        avatar_manager.avatar.add_log('info', f"YouTube: {query}")
+                except Exception as e:
+                    print(f"Error al activar visualizador para YouTube: {e}")
         except Exception as e:
             print(f"Error al buscar en YouTube: {e}")
             self.responder_con_audio("Error al buscar en YouTube")
@@ -377,6 +387,15 @@ class SpotifyVoiceControl:
 
                 comando_completo = recognizer.recognize_google(processed_audio, language="es-ES").lower()
                 print(f"Comando reconocido: {comando_completo}")
+                
+                # Agregar log del comando reconocido
+                if hasattr(self, 'avatar_enabled') and self.avatar_enabled:
+                    try:
+                        from modules.avatar.avatar_integration import avatar_manager
+                        if avatar_manager and avatar_manager.avatar:
+                            avatar_manager.avatar.add_log('command', f"Escuchado: {comando_completo}")
+                    except Exception as e:
+                        print(f"Error al agregar log de comando: {e}")
 
                 comando_completo = self.limpiar_comando(comando_completo)
 
@@ -555,6 +574,16 @@ class SpotifyVoiceControl:
                 if self.spotify_controller.verificar_estado_reproduccion(playing=True):
                     self.spotify_controller.pause_playback()
                     self.responder_con_audio("Reproducción detenida.")
+                    
+                    # Desactivar visualizador de música
+                    if hasattr(self, 'avatar_enabled') and self.avatar_enabled:
+                        try:
+                            from modules.avatar.avatar_integration import avatar_manager
+                            if avatar_manager and avatar_manager.avatar:
+                                avatar_manager.avatar.set_music_playing(False)
+                                avatar_manager.avatar.add_log('info', "Música detenida")
+                        except Exception as e:
+                            print(f"Error al desactivar visualizador: {e}")
                 else:
                     self.responder_con_audio("No se puede detener la reproducción porque ya está detenida.")
             elif comando == "siguiente":
@@ -593,6 +622,16 @@ class SpotifyVoiceControl:
 
     def buscar_y_reproducir_cancion(self, cancion):
         self.spotify_controller.buscar_y_reproducir_cancion(cancion, self.responder_con_audio)
+        
+        # Activar visualizador de música
+        if hasattr(self, 'avatar_enabled') and self.avatar_enabled:
+            try:
+                from modules.avatar.avatar_integration import avatar_manager
+                if avatar_manager and avatar_manager.avatar:
+                    avatar_manager.avatar.set_music_playing(True, 0.7)
+                    avatar_manager.avatar.add_log('info', f"Reproduciendo: {cancion}")
+            except Exception as e:
+                print(f"Error al activar visualizador de música: {e}")
 
     def mostrar_dispositivos_disponibles(self):
         self.spotify_controller.mostrar_dispositivos_disponibles()
@@ -601,6 +640,15 @@ class SpotifyVoiceControl:
     def responder_con_audio(self, respuesta, idioma=None):
        # """Responde con audio utilizando la voz de Gemini Live API."""
        ## asyncio.run(self._responder_con_audio_gemini_async(respuesta, idioma))
+        
+        # Agregar log de la respuesta
+        if hasattr(self, 'avatar_enabled') and self.avatar_enabled:
+            try:
+                from modules.avatar.avatar_integration import avatar_manager
+                if avatar_manager and avatar_manager.avatar:
+                    avatar_manager.avatar.add_log('response', f"Respuesta: {respuesta[:100]}{'...' if len(respuesta) > 100 else ''}")
+            except Exception as e:
+                print(f"Error al agregar log de respuesta: {e}")
         
         # Notificar al avatar que el asistente va a hablar
         if hasattr(self, 'avatar_enabled') and self.avatar_enabled:
