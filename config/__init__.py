@@ -1,0 +1,1 @@
+# spotify_voice_control/config/__init__.py
