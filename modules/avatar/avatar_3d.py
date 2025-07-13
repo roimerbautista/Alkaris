@@ -22,7 +22,7 @@ import json
 import os
 
 class Avatar3D:
-    def __init__(self, width=900, height=600, app_instance=None):
+    def __init__(self, width=700, height=500, app_instance=None):
         """Inicializar el avatar 3D mejorado"""
         self.width = width
         self.height = height
@@ -1145,17 +1145,28 @@ class Avatar3D:
     
     def update_music_visualizer(self, audio_data=None):
         """Actualizar el visualizador de música"""
-        if audio_data is not None:
-            # Simular análisis de frecuencia
-            import random
+        import random
+        import math
+        import time
+        
+        if self.music_playing:
+            # Generar animación más realista cuando hay música
+            current_time = time.time()
             for i in range(len(self.music_bars)):
-                # Simular diferentes frecuencias
-                target = random.random() * self.music_volume if self.music_playing else 0.0
-                self.music_bars[i] = self.music_bars[i] * 0.7 + target * 0.3
+                # Crear patrones de frecuencia más realistas
+                base_freq = math.sin(current_time * 2 + i * 0.5) * 0.3 + 0.5
+                random_variation = random.random() * 0.4
+                target = (base_freq + random_variation) * self.music_volume
+                target = max(0.1, min(1.0, target))  # Mantener entre 0.1 y 1.0
+                
+                # Suavizar la transición
+                self.music_bars[i] = self.music_bars[i] * 0.6 + target * 0.4
         else:
-            # Decaimiento gradual cuando no hay audio
+            # Decaimiento gradual cuando no hay música
             for i in range(len(self.music_bars)):
-                self.music_bars[i] *= 0.85
+                self.music_bars[i] *= 0.9
+                if self.music_bars[i] < 0.01:
+                    self.music_bars[i] = 0.0
     
     def set_music_playing(self, playing, volume=0.5):
         """Establecer el estado de reproducción de música"""
