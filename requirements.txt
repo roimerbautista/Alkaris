@@ -1,12 +1,9 @@
 spotipy
 SpeechRecognition
 gTTS
-playsound==1.2.2
 python-dotenv
 pygame
 requests
-PyAudio
-noisereduce
 numpy
 soundfile
 pyttsx3
@@ -17,11 +14,14 @@ unidecode
 librosa
 python-vlc
 Levenshtein
+pyaudio
 psutil
 google-generativeai
+noisereduce
+scipy
+sounddevice
 # Dependencias para Avatar 3D
 moderngl
 PyOpenGL
 PyOpenGL_accelerate
-glfw
 Pillow

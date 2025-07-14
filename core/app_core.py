@@ -42,8 +42,8 @@ from utils.audio_utils import normalizar_audio
 from gui.main_gui import MainGUI  # Importamos MainGUI aquí
 from modules.avatar.avatar_integration import avatar_manager, start_3d_avatar, stop_3d_avatar, on_assistant_speaking, on_assistant_silent, on_assistant_listening, on_assistant_not_listening, update_speech_level, set_avatar_emotion, make_avatar_blink
 
-from google import genai
-from google.genai import types # Import types for Gemini API configuration
+import google.generativeai as genai
+from google.generativeai import types # Import types for Gemini API configuration
 
 
 class SpotifyVoiceControl:
@@ -64,7 +64,10 @@ class SpotifyVoiceControl:
             print("GEMINI_API_KEY not found in environment variables.")
             raise ValueError("GEMINI_API_KEY not found in environment variables.")
 
-        self.client = genai.Client(api_key=self.GEMINI_API_KEY) # Initialize Gemini client
+        # Configurar la API key de Gemini
+        genai.configure(api_key=self.GEMINI_API_KEY)
+        # Crear el modelo en lugar del cliente
+        self.model = genai.GenerativeModel('gemini-pro')
 
         pygame.mixer.init()
         self.audio_lock = Lock()
