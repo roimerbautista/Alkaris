@@ -853,25 +853,34 @@ class Avatar3D:
         # Dibujar boca mejorada
         glPushMatrix()
         glTranslatef(0, -0.25, 0.9)
-        mouth_scale_x = 1.0 + self.speech_level * 0.8
-        mouth_scale_y = 1.0 + self.speech_level * 1.2
-        glScalef(mouth_scale_x, mouth_scale_y, 0.6)
+        
+        # Calcular escalado de manera más controlada
+        base_scale_x = 0.8  # Escala base para ancho
+        base_scale_y = 0.3  # Escala base para alto
         
         if self.is_speaking:
+            # Escalado suave y controlado cuando habla
+            mouth_scale_x = base_scale_x + (self.speech_level * 0.3)
+            mouth_scale_y = base_scale_y + (self.speech_level * 0.4)
+            
+            glScalef(mouth_scale_x, mouth_scale_y, 0.6)
             glColor3f(0.2, 0.1, 0.1)  # Interior oscuro de la boca
             self.draw_sphere_opengl(0.25, 15, 12)
             
-            # Dientes
+            # Dientes con posición fija
             glPushMatrix()
-            glTranslatef(0, 0.1, 0.2)
+            glLoadIdentity()  # Resetear transformaciones
+            glTranslatef(0, -0.15, 0.9)  # Reposicionar dientes
             glColor3f(1.0, 1.0, 0.95)  # Blanco marfil
-            glScalef(0.8, 0.3, 0.5)
+            glScalef(0.6, 0.2, 0.3)  # Escala fija para dientes
             self.draw_sphere_opengl(1.0, 10, 8)
             glPopMatrix()
         else:
+            # Boca cerrada con escala fija
+            glScalef(base_scale_x, base_scale_y, 0.8)
             glColor3f(0.8, 0.3, 0.3)  # Labios cerrados
-            glScalef(1.0, 0.4, 1.0)
             self.draw_sphere_opengl(0.2, 12, 10)
+        
         glPopMatrix()
         
         # Efectos especiales según el estado
